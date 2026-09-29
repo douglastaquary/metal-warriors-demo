@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#0b0e1c" />
+    <meta name="description" content="IRON NITRO — demo web de ação com mechs no estilo 16-bit." />
+    <link rel="icon" href="data:," />
+    <title>IRON NITRO — Orbital Foundry</title>
+  </head>
+  <body>
+    <main id="app" data-state="title">
+      <div id="stage">
+        <canvas id="game-canvas" aria-label="Iron Nitro game canvas"></canvas>
+        <div id="flash" aria-hidden="true"></div>
+        <div id="popups" aria-hidden="true"></div>
+
+        <section id="hud" aria-live="polite">
+          <div class="hud-pilot">
+            <canvas id="portrait" width="24" height="24" aria-hidden="true"></canvas>
+            <div class="pilot-body">
+              <div class="pilot-row">
+                <span class="pilot-name">NITRO</span>
+                <span class="lives"><i class="life-icon"></i><span id="lives-value">3</span></span>
+                <span id="weapon-badge" class="weapon">RIFLE</span>
+              </div>
+              <div class="meter armor" aria-label="Armor">
+                <span class="meter-label">AR</span>
+                <div id="armor-segments" class="segments"></div>
+              </div>
+              <div class="meter energy" aria-label="Energy">
+                <span class="meter-label">EN</span>
+                <div class="energy-track"><div id="energy-fill"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="hud-right">
+            <div class="score-block">
+              <span class="score-label">SCORE</span>
+              <strong id="score-value">0000000</strong>
+            </div>
+            <div class="progress">
+              <span id="section-label">HANGAR BAY</span>
+              <div class="progress-track">
+                <div id="progress-fill"></div>
+                <i id="progress-dot"></i>
+              </div>
+            </div>
+            <div class="hud-buttons">
+              <button id="btn-mute" class="icon-btn" type="button" data-action="mute" aria-label="Som">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6h3l4-3v10l-4-3H2z" /><path class="wave" d="M11 5.5c1 .8 1 4.2 0 5M12.5 4c2 1.6 2 6.4 0 8" /></svg>
+              </button>
+              <button id="btn-pause" class="icon-btn" type="button" data-action="pause" aria-label="Pausar">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 3h3v10H4zM9 3h3v10H9z" /></svg>
+              </button>
+            </div>
+          </div>
+
+          <div id="boss-hud" class="hud-boss" hidden>
+            <span class="boss-name">HAVOC</span>
+            <div class="boss-track"><div id="boss-fill"></div></div>
+          </div>
+        </section>
+
+        <div id="banner" aria-live="assertive"></div>
+
+        <section id="overlay-title" class="overlay title-screen">
+          <div class="select-panel">
+            <header class="panel-head"><span class="arrow">◄</span> PLAYER ONE SELECT <span class="arrow">►</span></header>
+            <div class="panel-body">
+              <div class="mech-window" aria-hidden="true"><span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span></div>
+              <div class="mech-info">
+                <h1>NITRO</h1>
+                <ul>
+                  <li>ADVANCED MOBILITY</li>
+                  <li>FUSION RIFLE</li>
+                  <li>BEAM SABER</li>
+                  <li>FLIGHT PACK</li>
+                  <li>SHIELD WALL</li>
+                </ul>
+              </div>
+            </div>
+            <button class="primary-btn" type="button" data-action="start">START MISSION</button>
+            <div class="controls-legend keyboard-only">
+              <span><kbd>←→</kbd> MOVE</span><span><kbd>↑</kbd> AIM</span><span><kbd>Z</kbd> JUMP / HOLD JET</span><span><kbd>X</kbd> FIRE</span><span><kbd>C</kbd> SABER</span><span><kbd>V</kbd> SHIELD</span>
+            </div>
+            <div class="controls-legend touch-only">
+              <span><b class="pad-b">B</b> JUMP / JET</span><span><b class="pad-y">Y</b> FIRE</span><span><b class="pad-a">A</b> SABER</span><span><b class="pad-x">X</b> SHIELD</span>
+            </div>
+          </div>
+          <p class="title-logo">IRON NITRO <small>STAGE 1 · ORBITAL FOUNDRY</small></p>
+        </section>
+
+        <section id="overlay-pause" class="overlay modal" hidden>
+          <div class="modal-panel">
+            <header class="panel-head">PAUSED</header>
+            <button class="primary-btn" type="button" data-action="resume">RESUME</button>
+            <button class="secondary-btn" type="button" data-action="restart">RESTART STAGE</button>
+            <button class="secondary-btn" type="button" data-action="mute">SOUND <span class="sound-state">ON</span></button>
+          </div>
+        </section>
+
+        <section id="overlay-gameover" class="overlay modal danger" hidden>
+          <div class="modal-panel">
+            <header class="panel-head">MECH DESTROYED</header>
+            <p class="modal-sub">SCORE <strong id="gameover-score">0</strong></p>
+            <button class="primary-btn" type="button" data-action="continue">CONTINUE FROM CHECKPOINT</button>
+            <button class="secondary-btn" type="button" data-action="restart">RESTART STAGE</button>
+          </div>
+        </section>
+
+        <section id="overlay-clear" class="overlay modal victory" hidden>
+          <div class="modal-panel">
+            <header class="panel-head">STAGE CLEAR</header>
+            <dl class="stats">
+              <div><dt>SCORE</dt><dd id="clear-score">0</dd></div>
+              <div><dt>TIME</dt><dd id="clear-time">00:00</dd></div>
+              <div><dt>DESTROYED</dt><dd id="clear-kills">0</dd></div>
+              <div><dt>MECHS LOST</dt><dd id="clear-deaths">0</dd></div>
+            </dl>
+            <button class="primary-btn" type="button" data-action="restart">PLAY AGAIN</button>
+          </div>
+        </section>
+      </div>
+
+      <div id="touch-controls">
+        <div id="touch-stick" aria-label="Direcional">
+          <div class="dpad-cross" aria-hidden="true"></div>
+          <div id="touch-knob"></div>
+        </div>
+        <div class="pad-buttons">
+          <button class="pad-btn pad-x" type="button" data-intent="shield" aria-label="Escudo"><b>X</b><small>SHIELD</small></button>
+          <button class="pad-btn pad-y" type="button" data-intent="fire" aria-label="Atirar"><b>Y</b><small>FIRE</small></button>
+          <button class="pad-btn pad-a" type="button" data-intent="saber" aria-label="Sabre"><b>A</b><small>SABER</small></button>
+          <button class="pad-btn pad-b" type="button" data-intent="jump" aria-label="Pular"><b>B</b><small>JUMP</small></button>
+        </div>
+      </div>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

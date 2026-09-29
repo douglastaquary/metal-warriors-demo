@@ -1,0 +1,7 @@
+node_modules/
+dist/
+test-results/
+artifacts/pass-*/
+.playwright-browsers/
+*.log
+.DS_Store

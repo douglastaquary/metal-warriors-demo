@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "runId": "pass-3",
+  "captures": [
+    { "mode": "desktop", "state": "title", "report": "artifacts/pass-3/desktop-title.json" },
+    { "mode": "desktop", "state": "active-play", "report": "artifacts/pass-3/desktop-active-play.json" },
+    { "mode": "desktop", "state": "combat", "report": "artifacts/pass-3/desktop-combat.json" },
+    { "mode": "desktop", "state": "jetpack", "report": "artifacts/pass-3/desktop-jetpack.json" },
+    { "mode": "desktop", "state": "boss", "report": "artifacts/pass-3/desktop-boss.json" },
+    { "mode": "desktop", "state": "paused", "report": "artifacts/pass-3/desktop-paused.json" },
+    { "mode": "desktop", "state": "game-over", "report": "artifacts/pass-3/desktop-game-over.json" },
+    { "mode": "desktop", "state": "stage-clear", "report": "artifacts/pass-3/desktop-stage-clear.json" },
+    { "mode": "mobile", "state": "title", "report": "artifacts/pass-3/mobile-title.json" },
+    { "mode": "mobile", "state": "active-play", "report": "artifacts/pass-3/mobile-active-play.json" },
+    { "mode": "mobile", "state": "boss", "report": "artifacts/pass-3/mobile-boss.json" }
+  ]
+}
