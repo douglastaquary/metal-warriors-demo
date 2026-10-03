@@ -223,7 +223,7 @@ export class Game {
     document.querySelectorAll<HTMLButtonElement>('[data-action]').forEach((button) => {
       button.addEventListener('click', (event) => {
         event.preventDefault();
-        void this.audio.unlock();
+        this.audio.unlock();
         this.handleAction(button.dataset.action ?? '');
         button.blur();
       });
@@ -436,7 +436,7 @@ export class Game {
     const i = this.input;
     if (this.state === 'title') {
       if (i.consume('start') || i.consume('jump') || i.consume('fire')) {
-        void this.audio.unlock();
+        this.audio.unlock();
         this.audio.uiSelect();
         this.beginPlay();
       }

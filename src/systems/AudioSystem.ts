@@ -36,6 +36,38 @@ const SONGS: Record<Exclude<Track, 'none'>, Song> = {
   },
 };
 
+// Events WebKit accepts as user activation for audio (pointerdown/touchstart are not).
+const GESTURE_EVENTS = ['touchend', 'pointerup', 'click', 'keydown'] as const;
+
+type NavigatorWithAudioSession = Navigator & { audioSession?: { type: string } };
+
+const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+/** Tiny silent 8-bit WAV used to move older iOS into the "playback" audio category. */
+function createSilentWavUrl(): string {
+  const samples = 2000;
+  const buffer = new ArrayBuffer(44 + samples);
+  const view = new DataView(buffer);
+  const write = (offset: number, text: string) => {
+    for (let i = 0; i < text.length; i += 1) view.setUint8(offset + i, text.charCodeAt(i));
+  };
+  write(0, 'RIFF');
+  view.setUint32(4, 36 + samples, true);
+  write(8, 'WAVE');
+  write(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, 8000, true);
+  view.setUint32(28, 8000, true);
+  view.setUint16(32, 1, true);
+  view.setUint16(34, 8, true);
+  write(36, 'data');
+  view.setUint32(40, samples, true);
+  for (let i = 0; i < samples; i += 1) view.setUint8(44 + i, 128);
+  return URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
+}
+
 function midiToHz(note: number): number {
   return 440 * Math.pow(2, (note - 69) / 12);
 }
@@ -55,15 +87,50 @@ export class AudioSystem {
   private scheduler: number | null = null;
   private muted = false;
   private lastPlayed = new Map<string, number>();
+  private armed = false;
+  private userPaused = false;
+  private silentEl: HTMLAudioElement | null = null;
   rng: () => number = () => 0.5;
 
   constructor() {
-    const unlock = () => {
-      void this.unlock();
-    };
-    window.addEventListener('pointerdown', unlock, { once: true });
-    window.addEventListener('keydown', unlock, { once: true });
-    window.addEventListener('touchend', unlock, { once: true });
+    this.armUnlock();
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible' || !this.ctx || this.userPaused) return;
+      void this.ctx.resume().catch(() => undefined);
+      this.armUnlock();
+    });
+  }
+
+  private readonly onGesture = (): void => this.unlock();
+
+  /** Keep retrying on every gesture until the context is running (iOS can also interrupt it later). */
+  private armUnlock(): void {
+    if (this.armed) return;
+    this.armed = true;
+    for (const type of GESTURE_EVENTS) window.addEventListener(type, this.onGesture, { capture: true, passive: true });
+  }
+
+  private disarmUnlock(): void {
+    if (!this.armed) return;
+    this.armed = false;
+    for (const type of GESTURE_EVENTS) window.removeEventListener(type, this.onGesture, { capture: true });
+  }
+
+  /** Let Web Audio play with the iPhone ringer switch on silent. */
+  private enablePlaybackSession(): void {
+    const session = (navigator as NavigatorWithAudioSession).audioSession;
+    if (session) {
+      if (session.type !== 'playback') session.type = 'playback';
+      return;
+    }
+    if (!IS_IOS) return;
+    if (!this.silentEl) {
+      const el = new Audio(createSilentWavUrl());
+      el.loop = true;
+      el.setAttribute('playsinline', '');
+      this.silentEl = el;
+    }
+    void this.silentEl.play().catch(() => undefined);
   }
 
   get isMuted(): boolean {
@@ -74,15 +141,32 @@ export class AudioSystem {
     return this.ctx?.state ?? 'locked';
   }
 
-  async unlock(): Promise<void> {
-    if (this.ctx) {
-      if (this.ctx.state === 'suspended') await this.ctx.resume();
-      return;
+  /** Must run synchronously inside a user gesture: iOS Safari only unlocks audio there. */
+  unlock(): void {
+    this.enablePlaybackSession();
+    if (!this.ctx) this.createContext();
+    const ctx = this.ctx;
+    if (!ctx) return;
+    if ((ctx.state as string) !== 'running' && !this.userPaused) {
+      // Starting a buffer inside the gesture is what actually unlocks WebKit.
+      const src = ctx.createBufferSource();
+      src.buffer = ctx.createBuffer(1, 1, 22050);
+      src.connect(ctx.destination);
+      src.start(0);
+      void ctx.resume().catch(() => undefined);
     }
+    if (ctx.state === 'running') this.disarmUnlock();
+  }
+
+  private createContext(): void {
     const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return;
     const ctx = new Ctor();
     this.ctx = ctx;
+    ctx.addEventListener('statechange', () => {
+      if (ctx.state === 'running') this.disarmUnlock();
+      else if (!this.userPaused) this.armUnlock();
+    });
     this.master = ctx.createGain();
     this.master.gain.value = this.muted ? 0 : 0.8;
     const comp = ctx.createDynamicsCompressor();
@@ -117,7 +201,6 @@ export class AudioSystem {
     jetSrc.connect(this.jetFilter).connect(this.jetGain).connect(this.sfxBus);
     jetSrc.start();
 
-    await ctx.resume();
     this.nextStepTime = ctx.currentTime + 0.05;
     this.scheduler = window.setInterval(() => this.schedule(), 25);
     if (this.pendingTrack !== 'none') this.playMusic(this.pendingTrack);
@@ -129,9 +212,10 @@ export class AudioSystem {
   }
 
   setPaused(paused: boolean): void {
+    this.userPaused = paused;
     if (!this.ctx) return;
     if (paused) void this.ctx.suspend();
-    else void this.ctx.resume();
+    else void this.ctx.resume().catch(() => undefined);
   }
 
   duck(amount: number, seconds: number): void {
